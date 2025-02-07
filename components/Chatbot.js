@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
+import { faRobot, faXmark, faPaperPlane, faPlay, faPause, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 export default function Chatbot() {
     const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +10,19 @@ export default function Chatbot() {
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const [translating, setTranslating] = useState(false);
+    const [playingAudio, setPlayingAudio] = useState(null);
+    const [generatingAudio, setGeneratingAudio] = useState(false);
+    const audioRef = useRef(new Audio());
+
+    // 語言選項
+    const languages = {
+        'zh-TW': '中文',
+        'en': '英文',
+        'ja': '日文',
+        'de': '德文',
+        'ko': '韓文'
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -86,6 +99,116 @@ export default function Chatbot() {
         }
     };
 
+    // 翻譯函數
+    const handleTranslate = async (messageIndex, targetLanguage) => {
+        if (translating) return;
+        
+        setTranslating(true);
+        try {
+            const response = await fetch('/api/translator-ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: messages[messageIndex].content,
+                    targetLanguage: languages[targetLanguage]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('翻譯請求失敗');
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // 更新訊息內容
+            setMessages(prev => prev.map((msg, idx) => 
+                idx === messageIndex 
+                    ? { ...msg, content: data.content, currentLang: targetLanguage }
+                    : msg
+            ));
+
+        } catch (error) {
+            console.error('Translation error:', error);
+            alert('翻譯過程發生錯誤，請稍後再試。');
+        } finally {
+            setTranslating(false);
+        }
+    };
+
+    // 停止當前播放的音訊
+    const stopCurrentAudio = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        setPlayingAudio(null);
+    };
+
+    // 處理音訊播放
+    const handlePlayAudio = async (messageIndex, text) => {
+        // 如果正在生成音訊或是已經在播放，則不執行
+        if (generatingAudio || playingAudio === messageIndex) {
+            stopCurrentAudio();
+            return;
+        }
+
+        setGeneratingAudio(true);
+        try {
+            const response = await fetch('/api/tts-ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    voice: 'alloy'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('音訊生成請求失敗');
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // 停止當前播放的音訊
+            stopCurrentAudio();
+
+            // 創建並播放新的音訊
+            audioRef.current = new Audio(`data:${data.format};base64,${data.audio}`);
+            audioRef.current.play();
+            setPlayingAudio(messageIndex);
+
+            // 監聽播放結束事件
+            audioRef.current.onended = () => {
+                setPlayingAudio(null);
+            };
+
+        } catch (error) {
+            console.error('Audio generation error:', error);
+            alert('音訊生成過程發生錯誤，請稍後再試。');
+        } finally {
+            setGeneratingAudio(false);
+        }
+    };
+
+    // 在組件卸載時清理音訊
+    useEffect(() => {
+        return () => {
+            stopCurrentAudio();
+        };
+    }, []);
+
     return (
         <div className="fixed bottom-4 right-4 z-50">
             {/* Chatbot 按鈕 */}
@@ -117,14 +240,45 @@ export default function Chatbot() {
                                 key={index}
                                 className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
-                                <div
-                                    className={`max-w-[80%] p-3 ${
-                                        message.type === 'user'
-                                            ? 'bg-gradient-to-br from-purple-400 to-purple-600 text-white rounded-tl-lg rounded-tr-lg rounded-bl-lg'
-                                            : 'bg-gradient-to-br from-gray-100 to-gray-300 text-gray-800 rounded-tr-lg rounded-tl-lg rounded-br-lg'
-                                    }`}
-                                >
-                                    {message.content}
+                                <div className="space-y-2 max-w-[80%]">
+                                    <div
+                                        className={`p-3 ${
+                                            message.type === 'user'
+                                                ? 'bg-gradient-to-br from-purple-400 to-purple-600 text-white rounded-tl-lg rounded-tr-lg rounded-bl-lg'
+                                                : 'bg-gradient-to-br from-gray-100 to-gray-300 text-gray-800 rounded-tr-lg rounded-tl-lg rounded-br-lg'
+                                        }`}
+                                    >
+                                        {message.content}
+                                    </div>
+                                    {message.type === 'bot' && (
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => handlePlayAudio(index, message.content)}
+                                                disabled={generatingAudio && playingAudio !== index}
+                                                className="text-sm px-2 py-1 rounded bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors disabled:opacity-50"
+                                            >
+                                                {generatingAudio && playingAudio === null ? (
+                                                    <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                                                ) : playingAudio === index ? (
+                                                    <FontAwesomeIcon icon={faPause} />
+                                                ) : (
+                                                    <FontAwesomeIcon icon={faPlay} />
+                                                )}
+                                            </button>
+                                            <select
+                                                value={message.currentLang || 'zh-TW'}
+                                                onChange={(e) => handleTranslate(index, e.target.value)}
+                                                disabled={translating}
+                                                className="text-sm px-2 py-1 rounded border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            >
+                                                {Object.entries(languages).map(([code, name]) => (
+                                                    <option key={code} value={code}>
+                                                        {name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
