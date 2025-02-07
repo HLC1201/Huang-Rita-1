@@ -25,24 +25,24 @@ export default function RootLayout({ children }) {
           <div className="container mx-auto px-4">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
-                <a href="/" className="text-xl font-bold text-gray-800">
+                <a href="/" className="text-xl font-bold text-blue-800">
                   黃麗娟網站
                 </a>
               </div>
               <div className="flex items-center space-x-6">
-                <a href="/" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <a href="/" className="text-blue-800 hover:text-blue-900 transition-colors">
                   首頁
                 </a>
-                <a href="/love" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <a href="/love" className="text-blue-800 hover:text-blue-900 transition-colors">
                   收藏最愛
                 </a>
-                <a href="/bad" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <a href="/bad" className="text-blue-800 hover:text-blue-900 transition-colors">
                   採雷集
                 </a>
-                <a href="/contact" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <a href="/contact" className="text-blue-800 hover:text-blue-900 transition-colors">
                   聯絡資訊
                 </a>
-                <a href="/todo-list" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <a href="/todo-list" className="text-blue-800 hover:text-blue-900 transition-colors">
                   待辦事項
                 </a>
               </div>
